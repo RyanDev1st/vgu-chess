@@ -24,17 +24,25 @@ let dev = store('vguDev'); if (!dev) dev = store('vguDev', Array.from(crypto.get
 const given = (location.hash.match(/admin=([A-Za-z0-9_-]+)/) || [])[1];
 if (given) { store('vguAdmin', given); history.replaceState(null, '', location.pathname); }   // the key never stays in the address bar
 const admin = given || store('vguAdmin');
+// Finds the stream laptop's current address and only goes there once it answers (after a restart the old address is dead
+// for a few seconds until the new one is published): keeps trying for 2 minutes.
 async function go() {
-  document.getElementById('again').hidden = true; document.getElementById('spin').hidden = false; document.getElementById('msg').textContent = 'Opening…';
-  try {
-    const g = await fetch(`https://api.github.com/gists/${GIST}?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json());
-    const url = String(g.files?.['tunnel.txt']?.content || '').trim();
-    if (!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) throw new Error('off');
-    location.replace(admin ? `${url}/admin?k=${encodeURIComponent(admin)}` : `${url}/#dev=${dev}`);
-  } catch {
-    document.getElementById('spin').hidden = true; document.getElementById('again').hidden = false;
-    document.getElementById('msg').textContent = 'The stream laptop is not online right now. Try again in a minute, or call Ryan.';
+  const $ = id => document.getElementById(id), t0 = Date.now();
+  $('again').hidden = true; $('spin').hidden = false; $('msg').textContent = 'Opening…';
+  while (Date.now() - t0 < 120000) {
+    try {
+      const g = await fetch(`https://api.github.com/gists/${GIST}?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json());
+      const url = String(g.files?.['tunnel.txt']?.content || '').trim();
+      if (/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) {
+        const alive = await fetch(url + '/alive', { cache: 'no-store', signal: AbortSignal.timeout(6000) }).then(r => r.ok, () => false);
+        if (alive) return location.replace(admin ? `${url}/admin?k=${encodeURIComponent(admin)}` : `${url}/#dev=${dev}`);
+      }
+    } catch {}
+    if (Date.now() - t0 > 4000) $('msg').textContent = 'Reconnecting to the stream laptop…';
+    await new Promise(r => setTimeout(r, 3000));
   }
+  $('spin').hidden = true; $('again').hidden = false;
+  $('msg').textContent = 'The stream laptop is not online right now. Try again in a minute, or call Ryan.';
 }
 go();
 </script>
