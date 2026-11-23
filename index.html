@@ -17,15 +17,20 @@
 </div>
 <script>
 const GIST = 'd1690e1530b9c072c4dd9b2dea25b8f0';
-const admin = (location.hash.match(/admin=([A-Za-z0-9_-]+)/) || [])[1];
-if (admin) history.replaceState(null, '', location.pathname);   // the admin token never stays in the address bar
+// This device's memory (random, kept in this browser): an approved device gets back in by itself after the stream laptop's
+// tunnel restarts. Ryan's admin key, once opened here, is remembered too, so on his phone the plain link opens the admin page.
+const store = (k, v) => { try { if (v !== undefined) localStorage.setItem(k, v); return localStorage.getItem(k); } catch { return v || ''; } };
+let dev = store('vguDev'); if (!dev) dev = store('vguDev', Array.from(crypto.getRandomValues(new Uint8Array(24)), b => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'[b & 63]).join(''));
+const given = (location.hash.match(/admin=([A-Za-z0-9_-]+)/) || [])[1];
+if (given) { store('vguAdmin', given); history.replaceState(null, '', location.pathname); }   // the key never stays in the address bar
+const admin = given || store('vguAdmin');
 async function go() {
   document.getElementById('again').hidden = true; document.getElementById('spin').hidden = false; document.getElementById('msg').textContent = 'Opening…';
   try {
     const g = await fetch(`https://api.github.com/gists/${GIST}?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json());
     const url = String(g.files?.['tunnel.txt']?.content || '').trim();
     if (!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) throw new Error('off');
-    location.replace(admin ? `${url}/admin?k=${encodeURIComponent(admin)}` : url + '/');
+    location.replace(admin ? `${url}/admin?k=${encodeURIComponent(admin)}` : `${url}/#dev=${dev}`);
   } catch {
     document.getElementById('spin').hidden = true; document.getElementById('again').hidden = false;
     document.getElementById('msg').textContent = 'The stream laptop is not online right now. Try again in a minute, or call Ryan.';
