@@ -31,9 +31,10 @@ async function go() {
   $('again').hidden = true; $('spin').hidden = false; $('msg').textContent = 'Opening…';
   while (Date.now() - t0 < 120000) {
     try {
-      const g = await fetch(`https://api.github.com/gists/${GIST}?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json());
-      const url = String(g.files?.['tunnel.txt']?.content || '').trim();
-      if (/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) {
+      // the raw file, not api.github.com: the API allows 60 reads an hour per network, and the whole school Wi-Fi is one
+      // network (2026-11-23 it ran out and everyone sat on "Reconnecting…"). The ?t= makes the raw file fresh every time.
+      const url = (await fetch(`https://gist.githubusercontent.com/RyanDev1st/${GIST}/raw/tunnel.txt?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.text())).trim();
+      if (/^https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com$/.test(url)) {
         const alive = await fetch(url + '/alive', { cache: 'no-store', signal: AbortSignal.timeout(6000) }).then(r => r.ok, () => false);
         if (alive) return location.replace(admin ? `${url}/admin?k=${encodeURIComponent(admin)}` : `${url}/#dev=${dev}`);
       }
